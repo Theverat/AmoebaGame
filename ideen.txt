@@ -1,3 +1,14 @@
+
 - Gravitationsbomben schießen, die alles zu sich hinziehen, bevor sie explodieren
 - Food altert, wird größer und röter, bevor es irgendwann verschwindet
 - Laser, der andere Amöben durchschneidet
+
+Xbox Controller Layout:
+- Linker Stick: Bewegung
+- Rechter Stick: Zielen
+- A: Bestätigen/Springen
+- B: Abbrechen
+- X:
+- Y:
+- Rechter Trigger: Primärangriff
+- Linker Trigger: Sekundärangriff

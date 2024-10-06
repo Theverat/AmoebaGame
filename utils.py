@@ -1,4 +1,6 @@
 import pygame
+import math
+
 
 def draw_text(window, text, position, font, color=(0, 0, 0), bg_color=None):
     text_surface = font.render(text, True, color)
@@ -12,3 +14,14 @@ def draw_text(window, text, position, font, color=(0, 0, 0), bg_color=None):
         pygame.draw.rect(window, bg_color, rect)
 
     window.blit(text_surface, position)
+
+
+def get_time():
+    return pygame.time.get_ticks() / 1000
+
+
+def normalize(vec2):
+    x = vec2[0]
+    y = vec2[1]
+    length = math.sqrt(x ** 2 + y ** 2)
+    return x / length, y / length
