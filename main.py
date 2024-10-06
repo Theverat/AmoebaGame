@@ -1,3 +1,6 @@
+from time import perf_counter
+start = perf_counter()
+
 import pygame
 
 import state
@@ -5,6 +8,7 @@ import state
 
 def main():
     state.init()
+    print(f"Startup time {round(perf_counter() - start, 2)} s")
 
     done = False
 

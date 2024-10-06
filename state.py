@@ -79,7 +79,7 @@ def init():
     clock = pygame.time.Clock()
     my_font = pygame.font.SysFont("Comic Sans MS", 30)
     debug_font = pygame.font.SysFont("Monospace", 20)
-    window = pygame.display.set_mode((800, 600), vsync=True)
+    # window = pygame.display.set_mode((800, 600), vsync=True)
 
     for i in range(pygame.joystick.get_count()):
         controller = pygame.joystick.Joystick(i)
@@ -90,10 +90,10 @@ def init():
     controllers.append(FakeController(keymap_arrow_keys, "Arrow Keys"))
 
     # Windowless fullscreen
-    # info = pygame.display.Info()
-    # w = info.current_w
-    # h = info.current_h
-    # window = pygame.display.set_mode((w, h), pygame.FULLSCREEN|pygame.SCALED)
+    info = pygame.display.Info()
+    win_size = (info.current_w, info.current_h)
+    flags = 0
+    window = pygame.display.set_mode(win_size, flags, vsync=1)
 
     for i in range(len(controllers)):
         add_player()
@@ -166,8 +166,12 @@ def update(dt: float):
     global food_last_added
     if game_time - food_last_added > FOOD_INTERVAL_SEC:
         food_last_added = game_time
-        food_amount = math.floor(dt * 100)
-        spawn_food(food_amount)
+        spawn_food(1)
+
+    # Debug: add food
+    pressed = pygame.key.get_pressed()
+    if pressed[pygame.K_SPACE]:
+        spawn_food(1)
 
     # Respawn dead players
     RESPAWN_TIME_SEC = 5
@@ -268,5 +272,6 @@ def draw(dt_used_ms: float):
         obj.draw()
 
     # Debug information
-    utils.draw_text(window, f"{round(clock.get_fps())} fps / {dt_used_ms} ms",
+    utils.draw_text(window, f"{round(clock.get_fps()):03} fps / {dt_used_ms:02} ms / "
+                            f"{len(entities.objects)} entities",
                     (10, 10), debug_font, bg_color=(0, 255, 255))

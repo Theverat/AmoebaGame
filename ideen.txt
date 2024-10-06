@@ -1,6 +1,8 @@
 
 - Gravitationsbomben schießen, die alles zu sich hinziehen, bevor sie explodieren
-- Food altert, wird größer und röter, bevor es irgendwann verschwindet
+- Nahrungspartikel altern, werden größer und verändern die Farbe, bevor sie irgendwann verschwinden
+- Nahrungspartikel erscheinen nicht einfach an zufälligen Positionen, sondern haben
+  ihren eigenen Lebenszyklus (vermehren sich, sterben etc.)
 - Laser, der andere Amöben durchschneidet
 
 Xbox Controller Layout:
