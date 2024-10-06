@@ -1,0 +1,3 @@
+- Gravitationsbomben schießen, die alles zu sich hinziehen, bevor sie explodieren
+- Food altert, wird größer und röter, bevor es irgendwann verschwindet
+- Laser, der andere Amöben durchschneidet
