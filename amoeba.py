@@ -1,5 +1,4 @@
 import pygame
-import sys
 from random import random
 import math
 
@@ -12,23 +11,19 @@ class Direction:
     DOWN = 2
     LEFT = 3
 
-move_map_p1 = {
+keymap_WASD = {
     Direction.UP: pygame.K_w,
     Direction.DOWN: pygame.K_s,
     Direction.LEFT: pygame.K_a,
     Direction.RIGHT: pygame.K_d,
 }
 
-move_map_p2 = {
+keymap_arrow_keys = {
     Direction.UP: pygame.K_UP,
     Direction.DOWN: pygame.K_DOWN,
     Direction.LEFT: pygame.K_LEFT,
     Direction.RIGHT: pygame.K_RIGHT,
 }
-
-# controller = player_to_controller_map[player_amoeba.player_id]
-# move_x = controller.get_axis(0)
-# move_y = controller.get_axis(1)
 
 class FakeController:
     def __init__(self, move_map, name):
@@ -39,23 +34,23 @@ class FakeController:
         return self.name
 
     def get_axis(self, axis: int):
+        AXIS_X = 0
+        AXIS_Y = 1
         pressed = pygame.key.get_pressed()
 
-        x = 0
-        y = 0
-
-        if pressed[self.move_map[Direction.UP]]:
-            y = -1
-        if pressed[self.move_map[Direction.RIGHT]]:
-            x = 1
-        if pressed[self.move_map[Direction.DOWN]]:
-            y = 1
-        if pressed[self.move_map[Direction.LEFT]]:
-            x = -1
-
-        if axis == 0:
+        if axis == AXIS_X:
+            x = 0
+            if pressed[self.move_map[Direction.RIGHT]]:
+                x = 1
+            if pressed[self.move_map[Direction.LEFT]]:
+                x = -1
             return x
-        elif axis == 1:
+        elif axis == AXIS_Y:
+            y = 0
+            if pressed[self.move_map[Direction.UP]]:
+                y = -1
+            if pressed[self.move_map[Direction.DOWN]]:
+                y = 1
             return y
         else:
             raise Exception("Unsupported axis:", axis)
@@ -65,9 +60,8 @@ pygame.display.set_caption("My Awesome Game")
 clock = pygame.time.Clock()
 target_fps = 60
 
-pygame.font.init() # you have to call this at the start,
-                   # if you want to use this module.
-my_font = pygame.font.SysFont('Comic Sans MS', 30)
+my_font = pygame.font.SysFont("Comic Sans MS", 30)
+debug_font = pygame.font.SysFont("Monospace", 20)
 
 # Windowless fullscreen
 # info = pygame.display.Info()
@@ -80,8 +74,8 @@ window = pygame.display.set_mode((800, 600), vsync=True)
 pygame.joystick.init()
 controllers = [pygame.joystick.Joystick(x) for x in range(pygame.joystick.get_count())]
 # Add keyboard support
-controllers.append(FakeController(move_map_p1, "WASD"))
-controllers.append(FakeController(move_map_p2, "Pfeiltasten"))
+controllers.append(FakeController(keymap_WASD, "WASD"))
+controllers.append(FakeController(keymap_arrow_keys, "Arrow Keys"))
 
 class Amoeba:
     def __init__(self, x: float, y: float, radius: float, color=None):
@@ -128,7 +122,7 @@ class Amoeba:
         pygame.draw.circle(window, outline_color, (self.pos_x, self.pos_y), self.radius, outline_width)
 
         if self.radius > 30:
-            text_surface = my_font.render(str(round(self.radius)), False, (0, 0, 0))
+            text_surface = my_font.render(str(round(self.radius)), True, (0, 0, 0))
             window.blit(text_surface, (self.pos_x - text_surface.get_width() / 2,
                                        self.pos_y - text_surface.get_height() / 2))
 
@@ -285,9 +279,30 @@ def update(dt: float):
         respawn_queue.append((player_amoeba, elapsed))
 
 
-def draw():
+def draw_text(text, position, color=(0, 0, 0), font=None, bg_color=None):
+    if font is None:
+        font = debug_font
+
+    text_surface = font.render(text, True, color)
+
+    if bg_color:
+        # (left, top), (width, height)
+        # rect = pygame.Rect(position, (text_surface.get_width(), text_surface.get_s))
+        rect = text_surface.get_rect()
+        rect.x = position[0]
+        rect.y = position[1]
+        pygame.draw.rect(window, bg_color, rect)
+
+    window.blit(text_surface, position)
+
+
+
+def draw(dt_used_ms: float):
     for amoeba in amoebae:
         amoeba.draw()
+
+    # Debug information
+    draw_text(f"{round(clock.get_fps())} fps / {dt_used_ms} ms", (10, 10), bg_color=(0, 255, 255))
 
 def main():
     init()
@@ -295,7 +310,10 @@ def main():
     done = False
 
     while not done:
+        # Delta time (time it took to update and draw the last frame, plus time waiting for vsync)
         dt = clock.tick(target_fps) / 1000
+        # Only the time it took to update and draw the last frame, excluding idle waiting time
+        dt_used_ms = clock.get_rawtime()
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -305,11 +323,8 @@ def main():
                     done = True
 
         window.fill(color=(255, 255, 255))
-
-        # The awesome game
         update(dt)
-        draw()
-
+        draw(dt_used_ms)
         pygame.display.flip()
 
     pygame.quit()
