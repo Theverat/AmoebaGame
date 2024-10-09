@@ -1,5 +1,6 @@
 import pygame
 import math
+from math import sqrt
 
 
 def draw_text(window, text, position, font, color=(0, 0, 0), bg_color=None):
@@ -23,5 +24,17 @@ def get_time():
 def normalize(vec2):
     x = vec2[0]
     y = vec2[1]
-    length = math.sqrt(x ** 2 + y ** 2)
+    length = sqrt(x ** 2 + y ** 2)
     return x / length, y / length
+
+
+def calc_distance_squared(obj1, obj2):
+    return (obj1.pos_x - obj2.pos_x)**2 + (obj1.pos_y - obj2.pos_y)**2
+
+
+def calc_distance(obj1, obj2):
+    return sqrt((obj1.pos_x - obj2.pos_x)**2 + (obj1.pos_y - obj2.pos_y)**2)
+
+
+def are_circles_colliding(obj1, obj2):
+    return calc_distance_squared(obj1, obj2) < (obj1.radius + obj2.radius)**2

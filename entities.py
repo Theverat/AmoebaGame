@@ -6,33 +6,19 @@ import utils
 
 
 class Object:
-    def __init__(self, x: float, y: float):
+    def __init__(self, x: float, y: float, radius: float):
         self.pos_x = x
         self.pos_y = y
+        self.radius = radius
         self.is_edible = False
 
     def draw(self):
         raise NotImplementedError()
 
 
-class Food(Object):
-    def __init__(self, x: float, y: float, radius: float, color):
-        super().__init__(x, y)
-        self.radius = radius
-        self.color = color
-        self.is_edible = True
-
-    def draw(self):
-        import state
-        outline_width = 2
-        outline_color = [50] * 3
-        pygame.draw.circle(state.window, self.color, (self.pos_x, self.pos_y), self.radius)
-        pygame.draw.circle(state.window, outline_color, (self.pos_x, self.pos_y), self.radius, outline_width)
-
-
 class MovingObject(Object):
-    def __init__(self, x: float, y: float):
-        super().__init__(x, y)
+    def __init__(self, x: float, y: float, radius: float):
+        super().__init__(x, y, radius)
         self.speed_x = 0
         self.speed_y = 0
 
@@ -45,15 +31,31 @@ class MovingObject(Object):
         self.pos_y += self.speed_y * dt
 
         # TODO also make dependent of dt
-        DAMPING = 0.97
+        DAMPING = 0.99
         self.speed_x *= DAMPING
         self.speed_y *= DAMPING
 
 
+class Food(MovingObject):
+    def __init__(self, x: float, y: float, radius: float, color):
+        super().__init__(x, y, radius)
+        self.color = color
+        self.is_edible = True
+
+    def draw(self):
+        import state
+        outline_width = 2
+        outline_color = [50] * 3
+        pygame.draw.circle(state.window, self.color, (self.pos_x, self.pos_y), self.radius)
+        pygame.draw.circle(state.window, outline_color, (self.pos_x, self.pos_y), self.radius, outline_width)
+
+        # text_surface = state.debug_font.render(f"{round(self.speed_x)}, {round(self.speed_y)}", True, (0, 0, 0))
+        # state.window.blit(text_surface, (self.pos_x, self.pos_y))
+
+
 class Amoeba(MovingObject):
     def __init__(self, x: float, y: float, radius: float, color=None):
-        super().__init__(x, y)
-        self.radius = radius
+        super().__init__(x, y, radius)
         if color:
             self.color = color
         else:
@@ -66,13 +68,15 @@ class Amoeba(MovingObject):
             self.color = color
         self.is_edible = True
 
-    def accelerate(self, dir_x: float, dir_y: float, strength: float):
-        super().accelerate(dir_x, dir_y, 70 / self.radius)
+    # def accelerate(self, dir_x: float, dir_y: float, strength: float):
+    #     super().accelerate(dir_x, dir_y, 70 / self.radius)
 
     def eat(self, other):
+        if self.radius < other.radius:
+            # Cant' eat something bigger than yourself
+            return
         area = (self.radius ** 2) * math.pi
         other_area = (other.radius ** 2) * math.pi
-        assert area > other_area  # Cant' eat something bigger than yourself
         self.radius = math.sqrt((area + other_area) / math.pi)
 
     def draw(self):
@@ -86,6 +90,9 @@ class Amoeba(MovingObject):
             text_surface = state.my_font.render(str(round(self.radius)), True, (0, 0, 0))
             state.window.blit(text_surface, (self.pos_x - text_surface.get_width() / 2,
                                              self.pos_y - text_surface.get_height() / 2))
+
+        # text_surface = state.debug_font.render(f"{round(self.speed_x)}, {round(self.speed_y)}", True, (0, 0, 0))
+        # state.window.blit(text_surface, (self.pos_x, self.pos_y))
 
 
 class PlayerAmoeba(Amoeba):
@@ -133,18 +140,50 @@ class PlayerAmoeba(Amoeba):
         return grenade
 
 
+# TODO Grenade could also look like a small black hole once it activates, then gets bigger the more it swallows
+#  until it shrinks rapidly
 class GravityGrenade(MovingObject):
     def __init__(self, x: float, y: float, creation_time: float):
-        super().__init__(x, y)
-        self.radius = 10
+        GRENADE_RADIUS = 10
+        super().__init__(x, y, GRENADE_RADIUS)
         self.creation_time = creation_time
-        self.FUSE_TIME = 3
+        # TODO maybe it would be a better idea to use percentages of the total lifetime for these steps
+        #  Like ARMING_DURATION = 0.1, FUSE_DURATION = 0.8, and EXPLOSION_DURATION is implicitly what's left until 1.0
+        # Time until the grenade activates its gravity after creation
+        self.ARMING_DURATION = 2
+        # Time until the grenade explodes after arming
+        self.FUSE_DURATION = 10
+        self.EXPLOSION_DURATION = 0.5
+        self.LIFETIME = self.ARMING_DURATION + self.FUSE_DURATION + self.EXPLOSION_DURATION
 
-    def try_to_explode(self, game_time: float):
-        ...
+    def is_active(self, game_time: float):
+        elapsed = game_time - self.creation_time
+        return elapsed > self.ARMING_DURATION and elapsed < self.ARMING_DURATION + self.FUSE_DURATION
+
+    def is_exploding(self, game_time: float):
+        elapsed = game_time - self.creation_time
+        return elapsed > self.ARMING_DURATION + self.FUSE_DURATION and elapsed < self.LIFETIME
+
+    def get_lifetime_percent(self, game_time: float):
+        elapsed = game_time - self.creation_time
+        return elapsed / self.LIFETIME
+
+    def should_be_removed(self, game_time: float):
+        elapsed = game_time - self.creation_time
+        return elapsed > self.LIFETIME
 
     def draw(self):
         import state
-        passed_lifetime = (utils.get_time() - self.creation_time) / self.FUSE_TIME
-        color = (255 * min(1, passed_lifetime), 0, 0)
-        pygame.draw.circle(state.window, color, (self.pos_x, self.pos_y), self.radius)
+        game_time = utils.get_time()
+        elapsed = game_time - self.creation_time
+
+        if self.is_exploding(game_time):
+            # Goes from 0 to 1
+            explosion_timeline_pos = (elapsed - (self.ARMING_DURATION + self.FUSE_DURATION)) / self.EXPLOSION_DURATION
+            color = (255, 128, 0)
+            # Over the explosion time, the radius gets bigger, then smaller
+            radius = self.radius + math.sin(explosion_timeline_pos * math.pi) * (self.radius * 10)
+            pygame.draw.circle(state.window, color, (self.pos_x, self.pos_y), radius)
+        else:
+            color = (220, 0, 0) if self.is_active(game_time) else (0, 0, 0)
+            pygame.draw.circle(state.window, color, (self.pos_x, self.pos_y), self.radius)

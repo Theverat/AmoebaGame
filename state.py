@@ -3,9 +3,11 @@ from random import random
 import math
 
 from input import FakeController, keymap_WASD, keymap_arrow_keys
-from entities import Object, Food, MovingObject, Amoeba, PlayerAmoeba
+from entities import Object, Food, MovingObject, Amoeba, PlayerAmoeba, GravityGrenade
 import utils
 
+
+TARGET_FRAMERATE = 60
 
 # Available controllers
 controllers: list[pygame.joystick.Joystick] = []
@@ -35,6 +37,7 @@ class EntityCollection:
         self.moving_objects: list[MovingObject] = []
         self.edible_objects: list[Object] = []
         self.player_amoebae: list[PlayerAmoeba] = []
+        self.gravity_grenades: list[GravityGrenade] = []
 
     def append(self, obj):
         self.objects.append(obj)
@@ -42,6 +45,8 @@ class EntityCollection:
             self.moving_objects.append(obj)
             if isinstance(obj, PlayerAmoeba):
                 self.player_amoebae.append(obj)
+            elif isinstance(obj, GravityGrenade):
+                self.gravity_grenades.append(obj)
         if obj.is_edible:
             self.edible_objects.append(obj)
 
@@ -51,6 +56,8 @@ class EntityCollection:
             self.moving_objects.remove(obj)
             if isinstance(obj, PlayerAmoeba):
                 self.player_amoebae.remove(obj)
+            elif isinstance(obj, GravityGrenade):
+                self.gravity_grenades.remove(obj)
         if obj.is_edible:
             self.edible_objects.remove(obj)
 
@@ -159,6 +166,7 @@ def update(dt: float):
     :param dt: Delta time, the time that passed since the last call to update().
                Used in various calculcations to make the game framerate-independent.
     """
+    gamespeed = dt / (1 / TARGET_FRAMERATE)
 
     # Add some food
     FOOD_INTERVAL_SEC = 0.1
@@ -171,7 +179,7 @@ def update(dt: float):
     # Debug: add food
     pressed = pygame.key.get_pressed()
     if pressed[pygame.K_SPACE]:
-        spawn_food(1)
+        spawn_food(20)
 
     # Respawn dead players
     RESPAWN_TIME_SEC = 5
@@ -209,7 +217,8 @@ def update(dt: float):
             right_trigger = 0
             left_trigger = 0
 
-        player_amoeba.accelerate(move_x, move_y, 1)
+        strength = gamespeed
+        player_amoeba.accelerate(move_x, move_y, strength)
 
         # Fire weapons
         if right_trigger > 0.95:
@@ -222,25 +231,23 @@ def update(dt: float):
     entities_to_delete = set()
 
     for player_amoeba in entities.player_amoebae:
-        radius_squared = player_amoeba.radius ** 2
-
         # Check if we ate something
         for other in entities.edible_objects:
             # Don't try to eat yourself
             if other is player_amoeba:
                 continue
 
-            if other.radius > player_amoeba.radius:
+            player_radius = player_amoeba.radius
+            other_radius = other.radius
+            if other_radius > player_radius:
                 # Can't eat anything bigger than ourselves
                 continue
 
-            px = player_amoeba.pos_x
-            py = player_amoeba.pos_y
-            x = other.pos_x
-            y = other.pos_y
-            dist_squared = (px - x) ** 2 + (py - y) ** 2
+            dist_squared = utils.calc_distance_squared(player_amoeba, other)
 
-            if dist_squared < (radius_squared + other.radius ** 2):
+            # We know that the other is the smaller amoeba. Don't eat it when the circles touch,
+            # but only once the others center overlaps with our edge.
+            if dist_squared < player_radius**2:
                 # We ate it
                 entities_to_delete.add(other)
                 if isinstance(other, PlayerAmoeba):
@@ -255,6 +262,37 @@ def update(dt: float):
     # Queue dead players for respawn later
     for player_amoeba in player_amoebae_to_delete:
         respawn_queue.append((player_amoeba, game_time))
+
+    # Handle gravity grenades
+    grenades_to_delete = set()
+    for grenade in entities.gravity_grenades:
+        if grenade.should_be_removed(game_time):
+            grenades_to_delete.add(grenade)
+            continue
+
+        if not grenade.is_active(game_time):
+            continue
+
+        for obj in entities.moving_objects:
+            # Ignore ourself
+            if obj is grenade:
+                continue
+
+            # F = (G * m1 * m2) / dist_squared
+            GRAVITY_CONSTANT = 1
+            # Grenade gets heavier and heavier
+            mass_grenade = 10 + 200 * grenade.get_lifetime_percent(game_time)
+            mass_obj = (obj.radius ** 2) * math.pi  # Just use the area for now
+            dist_squared = utils.calc_distance_squared(grenade, obj)
+            force = (GRAVITY_CONSTANT * mass_grenade * mass_obj) / dist_squared
+
+            force_x = grenade.pos_x - obj.pos_x
+            force_y = grenade.pos_y - obj.pos_y
+            force_x, force_y = utils.normalize((force_x, force_y))
+            obj.accelerate(force_x, force_y, force)
+
+    for grenade in grenades_to_delete:
+        entities.remove(grenade)
 
     entities.update(dt)
 

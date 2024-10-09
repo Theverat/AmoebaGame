@@ -14,7 +14,7 @@ def main():
 
     while not done:
         # Delta time (time it took to update and draw the last frame, plus time waiting for vsync)
-        dt = state.clock.tick(60) / 1000
+        dt = state.clock.tick(state.TARGET_FRAMERATE) / 1000
         # Only the time it took to update and draw the last frame, excluding idle waiting time
         dt_used_ms = state.clock.get_rawtime()
 
