@@ -44,10 +44,12 @@ class Food(MovingObject):
 
     def draw(self):
         import state
-        outline_width = 2
-        outline_color = [50] * 3
         pygame.draw.circle(state.window, self.color, (self.pos_x, self.pos_y), self.radius)
-        pygame.draw.circle(state.window, outline_color, (self.pos_x, self.pos_y), self.radius, outline_width)
+
+        # Outlines cost a ton of performance when there's a lot of food visible
+        # outline_width = 2
+        # outline_color = [50] * 3
+        # pygame.draw.circle(state.window, outline_color, (self.pos_x, self.pos_y), self.radius, outline_width)
 
         # text_surface = state.debug_font.render(f"{round(self.speed_x)}, {round(self.speed_y)}", True, (0, 0, 0))
         # state.window.blit(text_surface, (self.pos_x, self.pos_y))
@@ -100,7 +102,7 @@ class PlayerAmoeba(Amoeba):
         PLAYER_INIT_RADIUS = 10
         super().__init__(x, y, PLAYER_INIT_RADIUS)
         self.player_id = player_id
-        self.GRENADE_RELOAD_TIME = 5
+        self.GRENADE_RELOAD_TIME = .1
         # Start with a grenade ready
         self.last_grenade_fired = -99
 
@@ -187,3 +189,7 @@ class GravityGrenade(MovingObject):
         else:
             color = (220, 0, 0) if self.is_active(game_time) else (0, 0, 0)
             pygame.draw.circle(state.window, color, (self.pos_x, self.pos_y), self.radius)
+
+            # pygame.draw.circle(state.window, color, (self.pos_x, self.pos_y), 100, 1)
+            # pygame.draw.circle(state.window, color, (self.pos_x, self.pos_y), 200, 1)
+            # pygame.draw.circle(state.window, color, (self.pos_x, self.pos_y), 300, 1)

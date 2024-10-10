@@ -4,6 +4,7 @@ import math
 
 from input import FakeController, keymap_WASD, keymap_arrow_keys
 from entities import Object, Food, MovingObject, Amoeba, PlayerAmoeba, GravityGrenade
+from quadtree import QuadTree
 import utils
 
 
@@ -13,7 +14,7 @@ TARGET_FRAMERATE = 60
 controllers: list[pygame.joystick.Joystick] = []
 # Mapping from player_id to controller used
 player_to_controller_map: dict[int: pygame.joystick.Joystick] = {}
-next_free_player_id = 0
+next_free_player_id = 1
 
 window: pygame.Surface = None
 clock: pygame.time.Clock = None
@@ -32,14 +33,19 @@ debug_font: pygame.font.Font = None
 # gravity_grenades: list[GravityGrenade] = []
 
 class EntityCollection:
-    def __init__(self):
+    def __init__(self, window_size: tuple[float, float]):
         self.objects: list[Object] = []
         self.moving_objects: list[MovingObject] = []
         self.edible_objects: list[Object] = []
         self.player_amoebae: list[PlayerAmoeba] = []
         self.gravity_grenades: list[GravityGrenade] = []
 
+        margin = 50
+        bounding_box = pygame.Rect(-margin, -margin, window_size[0] + margin, window_size[1] + margin)
+        self.quad_tree = QuadTree(bounding_box)
+
     def append(self, obj):
+        self.quad_tree.add(obj)
         self.objects.append(obj)
         if isinstance(obj, MovingObject):
             self.moving_objects.append(obj)
@@ -51,22 +57,27 @@ class EntityCollection:
             self.edible_objects.append(obj)
 
     def remove(self, obj):
-        self.objects.remove(obj)
-        if isinstance(obj, MovingObject):
-            self.moving_objects.remove(obj)
-            if isinstance(obj, PlayerAmoeba):
-                self.player_amoebae.remove(obj)
-            elif isinstance(obj, GravityGrenade):
-                self.gravity_grenades.remove(obj)
-        if obj.is_edible:
-            self.edible_objects.remove(obj)
+        try:
+            self.quad_tree.remove(obj)
+            self.objects.remove(obj)
+            if isinstance(obj, MovingObject):
+                self.moving_objects.remove(obj)
+                if isinstance(obj, PlayerAmoeba):
+                    self.player_amoebae.remove(obj)
+                elif isinstance(obj, GravityGrenade):
+                    self.gravity_grenades.remove(obj)
+            if obj.is_edible:
+                self.edible_objects.remove(obj)
+        except ValueError:
+            # TODO remove try/except again
+            pass
 
     def update(self, dt):
         for moving_obj in self.moving_objects:
             moving_obj.update(dt)
 
 # Game entities
-entities = EntityCollection()
+entities: EntityCollection = None
 
 respawn_queue: list[tuple[PlayerAmoeba, float]] = []
 food_last_added = 0
@@ -82,7 +93,7 @@ def init():
     pygame.display.set_caption("Amoeba Game")
 
     # Init globals
-    global clock, my_font, debug_font, window
+    global clock, my_font, debug_font, window, entities
     clock = pygame.time.Clock()
     my_font = pygame.font.SysFont("Comic Sans MS", 30)
     debug_font = pygame.font.SysFont("Monospace", 20)
@@ -102,8 +113,26 @@ def init():
     flags = 0
     window = pygame.display.set_mode(win_size, flags, vsync=1)
 
+    entities = EntityCollection(win_size)
+
     for i in range(len(controllers)):
         add_player()
+
+    add_player()
+    add_player()
+    add_player()
+    add_player()
+
+    add_player()
+    add_player()
+    add_player()
+    add_player()
+
+    add_player()
+    add_player()
+    add_player()
+    add_player()
+    add_player()
 
     spawn_food(100)
 
@@ -115,7 +144,7 @@ def spawn_food(amount: int):
 
     for i in range(amount):
         entities.append(Food(random() * win_width, random() * win_height,
-                             5, (0, 255, 100)))
+                             5, (0, 170, 60)))
 
 
 def spawn_player(player_id: int, color=None):
@@ -179,7 +208,7 @@ def update(dt: float):
     # Debug: add food
     pressed = pygame.key.get_pressed()
     if pressed[pygame.K_SPACE]:
-        spawn_food(20)
+        spawn_food(30)
 
     # Respawn dead players
     RESPAWN_TIME_SEC = 5
@@ -232,7 +261,16 @@ def update(dt: float):
 
     for player_amoeba in entities.player_amoebae:
         # Check if we ate something
-        for other in entities.edible_objects:
+        p = player_amoeba
+        rs = p.radius * 1.3  # rs means radius scaled
+        rs2 = rs * 2
+        rect = pygame.Rect(p.pos_x - rs, p.pos_y - rs, rs2, rs2)
+        objs_in_rect = entities.quad_tree.get_objs_in_rect(rect)
+
+        for other in objs_in_rect:
+            if not other.is_edible:
+                continue
+
             # Don't try to eat yourself
             if other is player_amoeba:
                 continue
@@ -273,7 +311,12 @@ def update(dt: float):
         if not grenade.is_active(game_time):
             continue
 
-        for obj in entities.moving_objects:
+        r = 300  # TODO find a good distance where the gravity effect becomes negligible
+        rs2 = r * 2
+        rect = pygame.Rect(grenade.pos_x - r, grenade.pos_y - r, rs2, rs2)
+        objs_in_rect = entities.quad_tree.get_objs_in_rect(rect)
+
+        for obj in objs_in_rect:
             # Ignore ourself
             if obj is grenade:
                 continue
@@ -306,8 +349,16 @@ def draw(dt_used_ms: float):
     # Background color
     window.fill(color=(255, 255, 255))
 
+    p0 = entities.player_amoebae[0]
     for obj in entities.objects:
         obj.draw()
+
+        # rect = pygame.Rect(p0.pos_x - p0.radius, p0.pos_y - p0.radius, p0.radius * 2, p0.radius * 2)
+        # objs_in_rect = entities.quad_tree.get_objs_in_rect(rect)
+        # if obj in objs_in_rect:
+        #     outline_width = 4
+        #     outline_color = [255, 0, 0]
+        #     pygame.draw.circle(window, outline_color, (obj.pos_x, obj.pos_y), obj.radius, outline_width)
 
     # Debug information
     utils.draw_text(window, f"{round(clock.get_fps()):03} fps / {dt_used_ms:02} ms / "
