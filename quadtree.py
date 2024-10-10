@@ -14,7 +14,7 @@ class QuadTree:
     def remove(self, obj: Object):
         self.root_node.remove(obj)
 
-    def get_objs_in_rect(self, rect: pygame.Rect):
+    def get_objs_in_rect(self, rect: pygame.Rect) -> list[Object]:
         result = []
         self.root_node.get_objs_in_rect(rect, result)
         return result
@@ -23,10 +23,10 @@ class QuadTree:
 class Node:
     MAX_OBJS_PER_LEAF = 100
 
-    def __init__(self, bounding_box, is_leaf=False):
+    def __init__(self, bounding_box: pygame.Rect, is_leaf=False):
         self.bounding_box: pygame.Rect = bounding_box
         self.children: list[Node] = None
-        self.is_leaf = is_leaf
+        self.is_leaf: bool = is_leaf
         self.objects: list[Object] = []
 
     def get_objs_in_rect(self, rect: pygame.Rect, result: list[Object]):
@@ -39,7 +39,7 @@ class Node:
             for node in self.children:
                 node.get_objs_in_rect(rect, result)
 
-    def add(self, obj: Object):
+    def add(self, obj: Object) -> bool:
         if not self.bounding_box.collidepoint(obj.pos_x, obj.pos_y):
             return False
 
@@ -79,7 +79,7 @@ class Node:
                     return True
         return False
 
-    def remove(self, obj: Object):
+    def remove(self, obj: Object) -> bool:
         if not self.bounding_box.collidepoint(obj.pos_x, obj.pos_y):
             return False
 
