@@ -22,7 +22,7 @@ def test_many_entities():
     # at this framerate and check if it takes longer than a second to execute.
     min_framerate = 60
     for i in range(min_framerate):
-        dt = state.clock.tick(state.TARGET_FRAMERATE) / 1000
+        dt = state.clock.tick(1000) / 1000
         dt_used_ms = state.clock.get_rawtime()
         state.update(dt)
         state.draw(dt_used_ms)
