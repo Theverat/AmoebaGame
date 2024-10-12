@@ -27,13 +27,14 @@ class MovingObject(Object):
         self.speed_y += dir_y * strength
 
     def update(self, dt: float):
-        self.pos_x += self.speed_x * dt
-        self.pos_y += self.speed_y * dt
-
-        # TODO also make dependent of dt
-        DAMPING = 0.99
-        self.speed_x *= DAMPING
-        self.speed_y *= DAMPING
+        # From https://gamedev.stackexchange.com/a/169559
+        r = 0.04
+        pow_r_dt = pow(r, dt)
+        damping = (pow_r_dt - 1) / math.log(r)
+        self.pos_x += self.speed_x * damping
+        self.pos_y += self.speed_y * damping
+        self.speed_x *= pow_r_dt
+        self.speed_y *= pow_r_dt
 
 
 class Food(MovingObject):

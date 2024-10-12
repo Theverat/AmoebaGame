@@ -120,22 +120,6 @@ def init():
     for i in range(len(controllers)):
         add_player()
 
-    add_player()
-    add_player()
-    add_player()
-    add_player()
-
-    add_player()
-    add_player()
-    add_player()
-    add_player()
-
-    add_player()
-    add_player()
-    add_player()
-    add_player()
-    add_player()
-
     spawn_food(100)
 
 
@@ -197,7 +181,11 @@ def update(dt: float):
     :param dt: Delta time, the time that passed since the last call to update().
                Used in various calculcations to make the game framerate-independent.
     """
-    gamespeed = dt / (1 / TARGET_FRAMERATE)
+    # fps = clock.get_fps()
+    # if fps == 0:
+    #     fps = TARGET_FRAMERATE
+    # gamespeed = fps / TARGET_FRAMERATE
+    # gamespeed_correction = TARGET_FRAMERATE / fps
 
     # Add some food
     FOOD_INTERVAL_SEC = 0.1
@@ -248,7 +236,8 @@ def update(dt: float):
             right_trigger = 0
             left_trigger = 0
 
-        strength = gamespeed
+        # Acceleration from player input is reduced as radius increases
+        strength = max(80, (-0.5 * player_amoeba.radius + 205)) * dt
         player_amoeba.accelerate(move_x, move_y, strength)
 
         # Fire weapons

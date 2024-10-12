@@ -4,6 +4,8 @@
 - Nahrungspartikel erscheinen nicht einfach an zufälligen Positionen, sondern haben
   ihren eigenen Lebenszyklus (vermehren sich, sterben etc.)
 - Laser, der andere Amöben durchschneidet
+- Sollte man konstant Masse verlieren? Oder durch Bewegung/Benutzung von Fähigkeiten?
+  Zur Simulation von Energieverbrauch
 
 Xbox Controller Layout:
 - Linker Stick: Bewegung
