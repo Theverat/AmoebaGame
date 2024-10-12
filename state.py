@@ -23,6 +23,8 @@ clock: pygame.time.Clock = None
 my_font: pygame.font.Font = None
 debug_font: pygame.font.Font = None
 
+draw_debug = True
+
 # Game entities
 # # All moving objects
 # moving_objects: list[MovingObject] = []
@@ -349,16 +351,23 @@ def draw(dt_used_ms: float):
     # Background color
     window.fill(color=(255, 255, 255))
 
-    p0 = entities.player_amoebae[0]
+    p = entities.player_amoebae[0]
     for obj in entities.objects:
         obj.draw()
 
-        # rect = pygame.Rect(p0.pos_x - p0.radius, p0.pos_y - p0.radius, p0.radius * 2, p0.radius * 2)
-        # objs_in_rect = entities.quad_tree.get_objs_in_rect(rect)
-        # if obj in objs_in_rect:
-        #     outline_width = 4
-        #     outline_color = [255, 0, 0]
-        #     pygame.draw.circle(window, outline_color, (obj.pos_x, obj.pos_y), obj.radius, outline_width)
+        if draw_debug:
+            rs = p.radius * 1.1  # rs means radius scaled
+            rs2 = rs * 2
+            rect = pygame.Rect(p.pos_x - rs, p.pos_y - rs, rs2, rs2)
+            objs_in_rect = entities.quad_tree.get_objs_in_rect(rect)
+            if obj in objs_in_rect:
+                outline_width = 2
+                outline_color = (255, 0, 0)
+                pygame.draw.circle(window, outline_color, (obj.pos_x, obj.pos_y), obj.radius, outline_width)
+                pygame.draw.rect(window, outline_color, rect, width=1)
+
+    if draw_debug:
+        entities.quad_tree.root_node.draw(window)
 
     # Debug information
     utils.draw_text(window, f"{round(clock.get_fps()):03} fps / {dt_used_ms:02} ms / "

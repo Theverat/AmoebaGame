@@ -24,6 +24,8 @@ def main():
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_ESCAPE:
                     done = True
+                elif event.key == pygame.K_DELETE:
+                    state.draw_debug = not state.draw_debug
 
         state.update(dt)
         state.draw(dt_used_ms)

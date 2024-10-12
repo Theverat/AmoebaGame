@@ -91,3 +91,11 @@ class Node:
                 if node.remove(obj):
                     return True
         return False
+
+    def draw(self, window: pygame.Surface):
+        color = (0, 0, 0)
+        pygame.draw.rect(window, color, self.bounding_box, width=1)
+
+        if self.children:
+            for node in self.children:
+                node.draw(window)
