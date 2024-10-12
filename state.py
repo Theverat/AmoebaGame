@@ -85,7 +85,7 @@ respawn_queue: list[tuple[PlayerAmoeba, float]] = []
 food_last_added = 0
 
 
-def init():
+def init_system():
     """
     Runs before the main game loop starts.
     Global stuff is initialized here, and the starting game state is set up (spawning players, adding food etc.)
@@ -103,7 +103,7 @@ def init():
 
     for i in range(pygame.joystick.get_count()):
         controller = pygame.joystick.Joystick(i)
-        print(f"Controller [{i}]: {controller.get_name()}")
+        # print(f"Controller [{i}]: {controller.get_name()}")
         controllers.append(controller)
     # Add keyboard support
     controllers.append(FakeController(keymap_WASD, "WASD"))
@@ -117,6 +117,8 @@ def init():
 
     entities = EntityCollection(win_size)
 
+
+def init_board_and_players():
     for i in range(len(controllers)):
         add_player()
 
@@ -158,7 +160,7 @@ def add_player():
     player_id = next_free_player_id
     next_free_player_id += 1
 
-    print("Adding player with ID:", player_id)
+    # print("Adding player with ID:", player_id)
 
     # Find a free controller
     found_free_controller = False
@@ -166,11 +168,11 @@ def add_player():
         if controller not in player_to_controller_map.values():
             player_to_controller_map[player_id] = controller
             found_free_controller = True
-            print(f"Player {player_id} is using controller: {controller.get_name()}")
+            # print(f"Player {player_id} is using controller: {controller.get_name()}")
             break
 
-    if not found_free_controller:
-        print("Could not find a free controller for player", player_id)
+    # if not found_free_controller:
+    #     print("Could not find a free controller for player", player_id)
 
     spawn_player(player_id)
 
@@ -340,11 +342,11 @@ def draw(dt_used_ms: float):
     # Background color
     window.fill(color=(255, 255, 255))
 
-    p = entities.player_amoebae[0]
+    p = entities.player_amoebae[0] if entities.player_amoebae else None
     for obj in entities.objects:
         obj.draw()
 
-        if draw_debug:
+        if draw_debug and p:
             rs = p.radius * 1.1  # rs means radius scaled
             rs2 = rs * 2
             rect = pygame.Rect(p.pos_x - rs, p.pos_y - rs, rs2, rs2)

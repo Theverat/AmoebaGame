@@ -7,7 +7,8 @@ import state
 
 
 def main():
-    state.init()
+    state.init_system()
+    state.init_board_and_players()
     print(f"Startup time {round(perf_counter() - start, 2)} s")
 
     done = False
