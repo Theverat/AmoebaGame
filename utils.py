@@ -38,3 +38,7 @@ def calc_distance(obj1, obj2):
 
 def are_circles_colliding(obj1, obj2):
     return calc_distance_squared(obj1, obj2) < (obj1.radius + obj2.radius)**2
+
+
+def clamp(value, min_value, max_value):
+    return min(max(value, min_value), max_value)

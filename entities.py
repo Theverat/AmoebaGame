@@ -103,7 +103,7 @@ class PlayerAmoeba(Amoeba):
         PLAYER_INIT_RADIUS = 10
         super().__init__(x, y, PLAYER_INIT_RADIUS)
         self.player_id = player_id
-        self.GRENADE_RELOAD_TIME = .1
+        self.GRENADE_RELOAD_TIME = .5
         # Start with a grenade ready
         self.last_grenade_fired = -99
 
@@ -137,7 +137,7 @@ class PlayerAmoeba(Amoeba):
         grenade.speed_y = self.speed_y
 
         # Add a starting speed
-        LAUNCH_SPEED = 300
+        LAUNCH_SPEED = 1500
         grenade.accelerate(aim_x, aim_y, LAUNCH_SPEED)
 
         return grenade

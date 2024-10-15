@@ -5,6 +5,7 @@ import math
 from input import FakeController, keymap_WASD, keymap_arrow_keys
 from entities import Object, Food, MovingObject, Amoeba, PlayerAmoeba, GravityGrenade
 from quadtree import QuadTree
+from accelerator import Grid
 import utils
 
 
@@ -42,12 +43,13 @@ class EntityCollection:
         self.player_amoebae: list[PlayerAmoeba] = []
         self.gravity_grenades: list[GravityGrenade] = []
 
-        margin = 50
-        bounding_box = pygame.Rect(-margin, -margin, window_size[0] + margin, window_size[1] + margin)
-        self.quad_tree = QuadTree(bounding_box)
+        # margin = 50
+        # bounding_box = pygame.Rect(-margin, -margin, window_size[0] + margin, window_size[1] + margin)
+        # self.quad_tree = QuadTree(bounding_box)
+        self.accelerator = Grid(window_size[0], window_size[1], 16)
 
     def append(self, obj):
-        self.quad_tree.add(obj)
+        self.accelerator.add(obj)
         self.objects.append(obj)
         if isinstance(obj, MovingObject):
             self.moving_objects.append(obj)
@@ -59,24 +61,31 @@ class EntityCollection:
             self.edible_objects.append(obj)
 
     def remove(self, obj):
-        try:
-            self.quad_tree.remove(obj)
-            self.objects.remove(obj)
-            if isinstance(obj, MovingObject):
-                self.moving_objects.remove(obj)
-                if isinstance(obj, PlayerAmoeba):
-                    self.player_amoebae.remove(obj)
-                elif isinstance(obj, GravityGrenade):
-                    self.gravity_grenades.remove(obj)
-            if obj.is_edible:
-                self.edible_objects.remove(obj)
-        except ValueError:
-            # TODO remove try/except again
-            pass
+        # try:
+        self.accelerator.remove(obj, obj.pos_x, obj.pos_y, obj.radius)
+        self.objects.remove(obj)
+        if isinstance(obj, MovingObject):
+            self.moving_objects.remove(obj)
+            if isinstance(obj, PlayerAmoeba):
+                self.player_amoebae.remove(obj)
+            elif isinstance(obj, GravityGrenade):
+                self.gravity_grenades.remove(obj)
+        if obj.is_edible:
+            self.edible_objects.remove(obj)
+        # except ValueError:
+        #     # TODO remove try/except again
+        #     pass
 
     def update(self, dt):
-        for moving_obj in self.moving_objects:
-            moving_obj.update(dt)
+        for obj in self.moving_objects:
+            old_data = obj.pos_x, obj.pos_y, obj.radius
+            obj.update(dt)
+            new_data = obj.pos_x, obj.pos_y, obj.radius
+
+            # The object might have moved from one accelerator cell into another
+            if old_data != new_data:
+                self.accelerator.remove(obj, *old_data)
+                self.accelerator.add(obj)
 
 # Game entities
 entities: EntityCollection = None
@@ -255,10 +264,9 @@ def update(dt: float):
     for player_amoeba in entities.player_amoebae:
         # Check if we ate something
         p = player_amoeba
-        rs = p.radius * 1.3  # rs means radius scaled
-        rs2 = rs * 2
-        rect = pygame.Rect(p.pos_x - rs, p.pos_y - rs, rs2, rs2)
-        objs_in_rect = entities.quad_tree.get_objs_in_rect(rect)
+        r = p.radius
+        r2 = r * 2
+        objs_in_rect = entities.accelerator.get_objs_in_rect(p.pos_x - r, p.pos_y - r, r2, r2)
 
         for other in objs_in_rect:
             if not other.is_edible:
@@ -305,9 +313,8 @@ def update(dt: float):
             continue
 
         r = 300  # TODO find a good distance where the gravity effect becomes negligible
-        rs2 = r * 2
-        rect = pygame.Rect(grenade.pos_x - r, grenade.pos_y - r, rs2, rs2)
-        objs_in_rect = entities.quad_tree.get_objs_in_rect(rect)
+        r2 = r * 2
+        objs_in_rect = entities.accelerator.get_objs_in_rect(grenade.pos_x - r, grenade.pos_y - r, r2, r2)
 
         for obj in objs_in_rect:
             # Ignore ourself
@@ -347,18 +354,21 @@ def draw(dt_used_ms: float):
         obj.draw()
 
         if draw_debug and p:
-            rs = p.radius * 1.1  # rs means radius scaled
-            rs2 = rs * 2
-            rect = pygame.Rect(p.pos_x - rs, p.pos_y - rs, rs2, rs2)
-            objs_in_rect = entities.quad_tree.get_objs_in_rect(rect)
+            r = p.radius
+            r2 = r * 2
+            rect_coords = p.pos_x - r, p.pos_y - r, r2, r2
+            objs_in_rect = entities.accelerator.get_objs_in_rect(*rect_coords)
             if obj in objs_in_rect:
                 outline_width = 2
                 outline_color = (255, 0, 0)
                 pygame.draw.circle(window, outline_color, (obj.pos_x, obj.pos_y), obj.radius, outline_width)
-                pygame.draw.rect(window, outline_color, rect, width=1)
+                pygame.draw.rect(window, outline_color, pygame.Rect(*rect_coords), width=1)
 
     if draw_debug:
-        entities.quad_tree.root_node.draw(window)
+        entities.accelerator.debug_draw(window)
+
+        utils.draw_text(window, "(Press DEL to toggle debug info)",
+                        (10, 34), debug_font, bg_color=(0, 255, 255))
 
     # Debug information
     utils.draw_text(window, f"{round(clock.get_fps()):03} fps / {dt_used_ms:02} ms / "
