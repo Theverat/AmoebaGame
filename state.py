@@ -24,28 +24,15 @@ clock: pygame.time.Clock = None
 my_font: pygame.font.Font = None
 debug_font: pygame.font.Font = None
 
-draw_debug = True
-
-# Game entities
-# # All moving objects
-# moving_objects: list[MovingObject] = []
-# # Contains all amoebae, including player-controlled amoebe
-# amoebae: list[Amoeba] = []
-# # Contains only player-controlled amoebae
-# player_amoebae: list[PlayerAmoeba] = []
-# gravity_grenades: list[GravityGrenade] = []
+draw_debug = False
 
 class EntityCollection:
     def __init__(self, window_size: tuple[float, float]):
         self.objects: list[Object] = []
         self.moving_objects: list[MovingObject] = []
-        self.edible_objects: list[Object] = []
         self.player_amoebae: list[PlayerAmoeba] = []
         self.gravity_grenades: list[GravityGrenade] = []
 
-        # margin = 50
-        # bounding_box = pygame.Rect(-margin, -margin, window_size[0] + margin, window_size[1] + margin)
-        # self.quad_tree = QuadTree(bounding_box)
         self.accelerator = Grid(window_size[0], window_size[1], 16)
 
     def append(self, obj):
@@ -57,11 +44,8 @@ class EntityCollection:
                 self.player_amoebae.append(obj)
             elif isinstance(obj, GravityGrenade):
                 self.gravity_grenades.append(obj)
-        if obj.is_edible:
-            self.edible_objects.append(obj)
 
     def remove(self, obj):
-        # try:
         self.accelerator.remove(obj, obj.pos_x, obj.pos_y, obj.radius)
         self.objects.remove(obj)
         if isinstance(obj, MovingObject):
@@ -70,11 +54,6 @@ class EntityCollection:
                 self.player_amoebae.remove(obj)
             elif isinstance(obj, GravityGrenade):
                 self.gravity_grenades.remove(obj)
-        if obj.is_edible:
-            self.edible_objects.remove(obj)
-        # except ValueError:
-        #     # TODO remove try/except again
-        #     pass
 
     def update(self, dt):
         for obj in self.moving_objects:

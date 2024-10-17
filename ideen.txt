@@ -6,6 +6,7 @@
 - Laser, der andere Amöben durchschneidet
 - Sollte man konstant Masse verlieren? Oder durch Bewegung/Benutzung von Fähigkeiten?
   Zur Simulation von Energieverbrauch
+- Die Zellen könnten einen kleinen Zellkern haben, der schwer zu treffen ist, aber einen Weakspot darstellt
 
 Xbox Controller Layout:
 - Linker Stick: Bewegung

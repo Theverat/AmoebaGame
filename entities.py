@@ -36,6 +36,11 @@ class MovingObject(Object):
         self.speed_x *= pow_r_dt
         self.speed_y *= pow_r_dt
 
+        # Prevent stuff from going beyond the edges of the screen
+        import state
+        self.pos_x = utils.clamp(self.pos_x, 0, state.window.get_width())
+        self.pos_y = utils.clamp(self.pos_y, 0, state.window.get_height())
+
 
 class Food(MovingObject):
     def __init__(self, x: float, y: float, radius: float, color):
@@ -46,14 +51,6 @@ class Food(MovingObject):
     def draw(self):
         import state
         pygame.draw.circle(state.window, self.color, (self.pos_x, self.pos_y), self.radius)
-
-        # Outlines cost a ton of performance when there's a lot of food visible
-        # outline_width = 2
-        # outline_color = [50] * 3
-        # pygame.draw.circle(state.window, outline_color, (self.pos_x, self.pos_y), self.radius, outline_width)
-
-        # text_surface = state.debug_font.render(f"{round(self.speed_x)}, {round(self.speed_y)}", True, (0, 0, 0))
-        # state.window.blit(text_surface, (self.pos_x, self.pos_y))
 
 
 class Amoeba(MovingObject):
@@ -70,9 +67,6 @@ class Amoeba(MovingObject):
                 color[random_channel] = 200 + random() * 55
             self.color = color
         self.is_edible = True
-
-    # def accelerate(self, dir_x: float, dir_y: float, strength: float):
-    #     super().accelerate(dir_x, dir_y, 70 / self.radius)
 
     def eat(self, other):
         if self.radius < other.radius:
@@ -93,9 +87,6 @@ class Amoeba(MovingObject):
             text_surface = state.my_font.render(str(round(self.radius)), True, (0, 0, 0))
             state.window.blit(text_surface, (self.pos_x - text_surface.get_width() / 2,
                                              self.pos_y - text_surface.get_height() / 2))
-
-        # text_surface = state.debug_font.render(f"{round(self.speed_x)}, {round(self.speed_y)}", True, (0, 0, 0))
-        # state.window.blit(text_surface, (self.pos_x, self.pos_y))
 
 
 class PlayerAmoeba(Amoeba):
@@ -193,4 +184,4 @@ class GravityGrenade(MovingObject):
 
             # pygame.draw.circle(state.window, color, (self.pos_x, self.pos_y), 100, 1)
             # pygame.draw.circle(state.window, color, (self.pos_x, self.pos_y), 200, 1)
-            # pygame.draw.circle(state.window, color, (self.pos_x, self.pos_y), 300, 1)
+            pygame.draw.circle(state.window, color, (self.pos_x, self.pos_y), 300, 1)
