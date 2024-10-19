@@ -1,7 +1,10 @@
 import pygame
 from random import random
 import math
+from dataclasses import dataclass
+from typing import Optional
 
+import state
 import utils
 
 
@@ -97,8 +100,87 @@ class PlayerAmoeba(Amoeba):
         self.GRENADE_RELOAD_TIME = .5
         # Start with a grenade ready
         self.last_grenade_fired = -99
+        self.aim_angle: float = 0
+        # turn speed in degrees per second
+        self.aim_speed: float = math.radians(90)
+        self.reserve_powerups = []
+        from powerups import Powerup
+        self.active_powerup: Optional[Powerup] = None
 
-    def fire_grenade(self, game_time: float, aim_x: float, aim_y: float):
+    def add_powerup(self, powerup):
+        self.reserve_powerups.append(powerup)
+
+    def update_aim(self, dt: float, aim_x: float, aim_y: float):
+        if aim_x or aim_y:
+            target_angle = utils.vec_to_angle((aim_x, aim_y))
+
+            difference = math.fmod(target_angle - self.aim_angle, math.tau)
+            distance = math.fmod(2 * difference, math.tau) - difference
+            movement_abs = min(abs(distance), self.aim_speed * dt)
+            movement = math.copysign(movement_abs, distance)
+
+            self.aim_angle += movement
+
+    def update(self, dt: float):
+        super().update(dt)
+
+        if not self.active_powerup and self.reserve_powerups:
+            self.active_powerup = self.reserve_powerups.pop(0)
+
+        if self.active_powerup:
+            aim_x, aim_y = utils.angle_to_vec(self.aim_angle)
+            self.active_powerup.pos_x = self.pos_x + aim_x * self.radius
+            self.active_powerup.pos_y = self.pos_y + aim_y * self.radius
+
+        for powerup in self.reserve_powerups:
+            # Copy player cell acceleration to powerups
+            powerup.speed_x = self.speed_x
+            powerup.speed_y = self.speed_y
+
+            # Make the powerups move inside the player amoeba randomly
+            distance_squared = utils.calc_distance_squared_objs(self, powerup)
+
+            if distance_squared > (self.radius * 0.7)**2:
+                # Accelerate back towards center
+                dir_x = self.pos_x - powerup.pos_x
+                dir_y = self.pos_y - powerup.pos_y
+            else:
+                # Accelerate in random direction
+                dir_x = random() * 2 - 1
+                dir_y = random() * 2 - 1
+
+            dir_x, dir_y = utils.normalize((dir_x, dir_y))
+            powerup.accelerate(dir_x, dir_y, random() * 10)
+
+            powerup.update(dt)
+
+    def draw(self):
+        super().draw()
+
+        # Draw powerups
+        if self.active_powerup:
+            self.active_powerup.draw()
+
+        for powerup in self.reserve_powerups:
+            powerup.draw()
+
+        if state.draw_debug:
+            # Show where the aim is currently
+            from state import window
+            color = (1, 0, 0)
+
+            aim_x = math.cos(self.aim_angle)
+            aim_y = math.sin(self.aim_angle)
+
+            start_pos = (self.pos_x, self.pos_y)
+            end_pos = (self.pos_x + aim_x * 100,
+                       self.pos_y + aim_y * 100)
+            width = 2
+            pygame.draw.line(window, color, start_pos, end_pos, width)
+
+            utils.draw_text(window, str(math.degrees(self.aim_angle)), (self.pos_x, self.pos_y), state.debug_font)
+
+    def fire_grenade(self, game_time: float):
         if game_time - self.last_grenade_fired < self.GRENADE_RELOAD_TIME:
             # Not reloaded yet, can't fire
             return None
@@ -106,18 +188,8 @@ class PlayerAmoeba(Amoeba):
         self.last_grenade_fired = game_time
 
         # Create the grenade outside of our circle in the direction that we're aiming
-        # Note: I'm assuming aim_x and aim_y are normalized
-        # In case the player isn't aiming, spawn the grenade in the movement direction
-        if aim_x == 0 and aim_y == 0:
-            if self.speed_x > 0 or self.speed_y > 0:
-                aim_x, aim_y = utils.normalize((self.speed_x, self.speed_y))
-            else:
-                # Player is not aiming and not moving -> use some direction to
-                # prevent the grenade from spawning inside the player
-                aim_x = 1
-                aim_y = 0
-
         spawn_distance = self.radius + 10
+        aim_x, aim_y = utils.angle_to_vec(self.aim_angle)
         x = self.pos_x + aim_x * spawn_distance
         y = self.pos_y + aim_y * spawn_distance
 
@@ -167,7 +239,7 @@ class GravityGrenade(MovingObject):
         return elapsed > self.LIFETIME
 
     def draw(self):
-        import state
+        from state import window
         game_time = utils.get_time()
         elapsed = game_time - self.creation_time
 
@@ -177,11 +249,11 @@ class GravityGrenade(MovingObject):
             color = (255, 128, 0)
             # Over the explosion time, the radius gets bigger, then smaller
             radius = self.radius + math.sin(explosion_timeline_pos * math.pi) * (self.radius * 10)
-            pygame.draw.circle(state.window, color, (self.pos_x, self.pos_y), radius)
+            pygame.draw.circle(window, color, (self.pos_x, self.pos_y), radius)
         else:
             color = (220, 0, 0) if self.is_active(game_time) else (0, 0, 0)
-            pygame.draw.circle(state.window, color, (self.pos_x, self.pos_y), self.radius)
+            pygame.draw.circle(window, color, (self.pos_x, self.pos_y), self.radius)
 
             # pygame.draw.circle(state.window, color, (self.pos_x, self.pos_y), 100, 1)
             # pygame.draw.circle(state.window, color, (self.pos_x, self.pos_y), 200, 1)
-            pygame.draw.circle(state.window, color, (self.pos_x, self.pos_y), 300, 1)
+            pygame.draw.circle(window, color, (self.pos_x, self.pos_y), 300, 1)

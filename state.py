@@ -1,9 +1,10 @@
 import pygame
-from random import random
+from random import random, choice as random_choice
 import math
 
 from input import FakeController, keymap_WASD, keymap_arrow_keys
 from entities import Object, Food, MovingObject, Amoeba, PlayerAmoeba, GravityGrenade
+from powerups import PowerupType, Powerup
 from quadtree import QuadTree
 from accelerator import Grid
 import utils
@@ -71,6 +72,7 @@ entities: EntityCollection = None
 
 respawn_queue: list[tuple[PlayerAmoeba, float]] = []
 food_last_added = 0
+powerup_last_added = 0
 
 
 def init_system():
@@ -111,6 +113,9 @@ def init_board_and_players():
         add_player()
 
     spawn_food(100)
+    spawn_powerup(1)
+
+    entities.player_amoebae[0].radius = 100
 
 
 def spawn_food(amount: int):
@@ -121,6 +126,35 @@ def spawn_food(amount: int):
     for i in range(amount):
         entities.append(Food(random() * win_width, random() * win_height,
                              5, (0, 170, 60)))
+
+
+def spawn_powerup(amount: int):
+    info = pygame.display.Info()
+    win_width = info.current_w
+    win_height = info.current_h
+
+    MIN_DIST_TO_PLAYERS = 200
+
+    for i in range(amount):
+        powerup_type = random_choice(PowerupType.values)
+
+        too_close_to_players = True
+
+        while too_close_to_players:
+            x = random() * win_width
+            y = random() * win_height
+            too_close_to_players = False
+
+            rect = utils.get_square_around_point(x, y, MIN_DIST_TO_PLAYERS)
+            objs_in_rect = entities.accelerator.get_objs_in_rect(*rect)
+
+            for obj in objs_in_rect:
+                dist_squared = utils.calc_distance_squared((x, y), (obj.pos_x, obj.pos_y))
+                if dist_squared < MIN_DIST_TO_PLAYERS**2:
+                    too_close_to_players = True
+
+        entities.append(Powerup(x, y, powerup_type))
+
 
 
 def spawn_player(player_id: int, color=None):
@@ -185,6 +219,13 @@ def update(dt: float):
         food_last_added = game_time
         spawn_food(1)
 
+    POWERUP_INTERVAL_SEC = 10
+    game_time = utils.get_time()
+    global powerup_last_added
+    if game_time - powerup_last_added > POWERUP_INTERVAL_SEC:
+        powerup_last_added = game_time
+        spawn_powerup(1)
+
     # Debug: add food
     pressed = pygame.key.get_pressed()
     if pressed[pygame.K_SPACE]:
@@ -211,10 +252,15 @@ def update(dt: float):
             from input import Axis
 
             controller = player_to_controller_map[player_amoeba.player_id]
+
             move_x = controller.get_axis(Axis.LEFT_STICK_X)
             move_y = controller.get_axis(Axis.LEFT_STICK_Y)
+            move_x, move_y = utils.normalize((move_x, move_y))
+
             aim_x = controller.get_axis(Axis.RIGHT_STICK_X)
             aim_y = controller.get_axis(Axis.RIGHT_STICK_Y)
+            aim_x, aim_y = utils.normalize((aim_x, aim_y))
+
             right_trigger = controller.get_axis(Axis.RIGHT_TRIGGER)
             left_trigger = controller.get_axis(Axis.LEFT_TRIGGER)
         except KeyError:
@@ -226,13 +272,17 @@ def update(dt: float):
             right_trigger = 0
             left_trigger = 0
 
+        TRIGGER_THRESHOLD = 0.95
+
         # Acceleration from player input is reduced as radius increases
         strength = max(80, (-0.5 * player_amoeba.radius + 205)) * dt
         player_amoeba.accelerate(move_x, move_y, strength)
 
+        player_amoeba.update_aim(dt, aim_x, aim_y)
+
         # Fire weapons
-        if right_trigger > 0.95:
-            grenade = player_amoeba.fire_grenade(game_time, aim_x, aim_y)
+        if right_trigger > TRIGGER_THRESHOLD:
+            grenade = player_amoeba.fire_grenade(game_time)
             if grenade:
                 entities.append(grenade)
 
@@ -248,7 +298,7 @@ def update(dt: float):
         objs_in_rect = entities.accelerator.get_objs_in_rect(p.pos_x - r, p.pos_y - r, r2, r2)
 
         for other in objs_in_rect:
-            if not other.is_edible:
+            if not (other.is_edible or isinstance(other, Powerup)):
                 continue
 
             # Don't try to eat yourself
@@ -261,7 +311,7 @@ def update(dt: float):
                 # Can't eat anything bigger than ourselves
                 continue
 
-            dist_squared = utils.calc_distance_squared(player_amoeba, other)
+            dist_squared = utils.calc_distance_squared_objs(player_amoeba, other)
 
             # We know that the other is the smaller amoeba. Don't eat it when the circles touch,
             # but only once the others center overlaps with our edge.
@@ -270,8 +320,12 @@ def update(dt: float):
                 entities_to_delete.add(other)
                 if isinstance(other, PlayerAmoeba):
                     player_amoebae_to_delete.add(other)
-                # Make us bigger
-                player_amoeba.eat(other)
+
+                if other.is_edible:
+                    # Make us bigger
+                    player_amoeba.eat(other)
+                elif isinstance(other, Powerup):
+                    player_amoeba.add_powerup(other)
 
     # Remove all entities that were eaten
     for amoeba in entities_to_delete:
@@ -300,18 +354,18 @@ def update(dt: float):
             if obj is grenade:
                 continue
 
-            # F = (G * m1 * m2) / dist_squared
-            GRAVITY_CONSTANT = 1
-            # Grenade gets heavier and heavier
-            mass_grenade = 10 + 200 * grenade.get_lifetime_percent(game_time)
-            mass_obj = (obj.radius ** 2) * math.pi  # Just use the area for now
-            dist_squared = utils.calc_distance_squared(grenade, obj)
-            force = (GRAVITY_CONSTANT * mass_grenade * mass_obj) / dist_squared
+            # Grenade gets heavier and heavier over time
+            grenade_mass = 10 + 200 * grenade.get_lifetime_percent(game_time)
+            # Just use the object area as its mass for now
+            obj_mass = (obj.radius ** 2) * math.pi
 
-            force_x = grenade.pos_x - obj.pos_x
-            force_y = grenade.pos_y - obj.pos_y
-            force_x, force_y = utils.normalize((force_x, force_y))
-            obj.accelerate(force_x, force_y, force)
+            force = utils.calc_gravitational_force(obj, obj_mass, grenade, grenade_mass)
+            force = utils.clamp(force, 0, 50)
+
+            dir_x = grenade.pos_x - obj.pos_x
+            dir_y = grenade.pos_y - obj.pos_y
+            dir_x, dir_y = utils.normalize((dir_x, dir_y))
+            obj.accelerate(dir_x, dir_y, force)
 
     for grenade in grenades_to_delete:
         entities.remove(grenade)

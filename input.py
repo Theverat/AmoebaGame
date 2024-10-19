@@ -86,8 +86,10 @@ class FakeController:
                 else:
                     return 0
             elif axis == Axis.LEFT_TRIGGER:
-                # TODO
-                return 0
+                if pressed[self.move_map[LEFT_TRIGGER]]:
+                    return 1
+                else:
+                    return 0
             else:
                 raise Exception("Unsupported axis:", axis)
         except KeyError:
