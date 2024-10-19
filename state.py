@@ -311,6 +311,12 @@ def update(dt: float):
                 # Can't eat anything bigger than ourselves
                 continue
 
+            # How big the other amoeba is relative to us (near 1 = same size, 0.5 = other is half size, etc.)
+            other_radius_relative = other_radius / player_radius
+            if other_radius_relative > 0.8:
+                # Can't eat the smaller amoeba if it is almost as big as us
+                continue
+
             dist_squared = utils.calc_distance_squared_objs(player_amoeba, other)
 
             # We know that the other is the smaller amoeba. Don't eat it when the circles touch,
